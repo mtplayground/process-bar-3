@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use crate::models::note::Note;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub struct NoteInput {
@@ -31,7 +31,7 @@ impl NoteInput {
     pub fn validate(&self) -> Result<ValidatedNoteInput, NoteInputErrors> {
         let title = self.title.trim().to_owned();
         let content = self.content.trim().to_owned();
-        let tags = normalize_tags(&self.tags_raw);
+        let tags = Note::parse_tags_csv(&self.tags_raw);
 
         let mut errors = NoteInputErrors::default();
 
@@ -55,20 +55,6 @@ impl NoteInput {
             Err(errors)
         }
     }
-}
-
-fn normalize_tags(tags_raw: &str) -> Vec<String> {
-    let mut tags = BTreeSet::new();
-
-    for tag in tags_raw.split(',') {
-        let normalized = tag.trim().to_lowercase();
-
-        if !normalized.is_empty() {
-            tags.insert(normalized);
-        }
-    }
-
-    tags.into_iter().collect()
 }
 
 #[cfg(test)]
