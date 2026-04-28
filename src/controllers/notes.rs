@@ -101,6 +101,22 @@ pub async fn show(
     Ok(NoteShowTemplate { note })
 }
 
+pub async fn delete(
+    State(state): State<AppState>,
+    Path(note_id): Path<Uuid>,
+) -> AppResult<Response> {
+    let deleted = Note::delete(&state.pool, note_id).await?;
+
+    if deleted {
+        Ok(redirect_with_flash(
+            "/notes",
+            "Note deleted successfully.",
+        ))
+    } else {
+        Err(AppError::not_found("The requested note does not exist."))
+    }
+}
+
 fn redirect_with_flash(redirect_to: &str, message: &str) -> Response {
     let cookie_value = format!(
         "flash=success.{}; Max-Age=60; Path=/; HttpOnly; SameSite=Lax",
