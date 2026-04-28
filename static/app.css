@@ -183,6 +183,71 @@ ol {
   gap: 1rem;
 }
 
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.empty-state {
+  padding: 1rem 1.1rem;
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.note-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.note-row {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.note-row__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.note-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.note-title a {
+  text-decoration: none;
+}
+
+.note-title a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+}
+
+.note-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.96rem;
+}
+
+.note-body {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.inline-form {
+  display: inline-flex;
+}
+
 form {
   display: grid;
   gap: 1rem;
@@ -272,5 +337,9 @@ select:focus {
   .site-nav > *,
   .actions > * {
     flex: 1 1 12rem;
+  }
+
+  .note-row__head {
+    flex-direction: column;
   }
 }
