@@ -8,6 +8,7 @@ askama = { version = "0.12", features = ["with-axum"] }
 axum = "0.7"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
+envy = "0.4"
 serde = { version = "1", features = ["derive"] }
 sqlx = { version = "0.8", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio-rustls", "uuid"] }
 thiserror = "1"

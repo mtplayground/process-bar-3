@@ -1,8 +1,11 @@
-use axum::{Router, routing::get};
-use dotenvy::dotenv;
-use std::{env, error::Error, net::SocketAddr};
+mod config;
+
+use axum::{routing::get, Router};
+use std::{error::Error, net::SocketAddr};
 use tokio::net::TcpListener;
 use tracing::info;
+
+use config::Config;
 
 async fn healthcheck() -> &'static str {
     "ok"
@@ -10,11 +13,8 @@ async fn healthcheck() -> &'static str {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    dotenv().ok();
-
-    let host = env::var("HOST").unwrap_or_else(|_| String::from("0.0.0.0"));
-    let port = env::var("PORT").unwrap_or_else(|_| String::from("8080"));
-    let address: SocketAddr = format!("{host}:{port}").parse()?;
+    let config = Config::from_env()?;
+    let address: SocketAddr = config.bind_addr.parse()?;
 
     let app = Router::new().route("/", get(healthcheck));
 
