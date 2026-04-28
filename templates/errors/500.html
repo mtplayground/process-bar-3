@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+
+{% block title %}Server Error{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <p class="eyebrow">Error 500</p>
+    <h1>Something went wrong.</h1>
+    <p>{{ message }}</p>
+    <p class="note-meta">Please try again in a moment or return to the notes index.</p>
+  </div>
+
+  <div class="actions">
+    <a class="button" href="/notes">Back to notes</a>
+  </div>
+</div>
+{% endblock %}
