@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Notes{% endblock %}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <div class="brand-block">
+          <a class="brand-mark" href="/notes">Process Bar</a>
+          <p class="brand-copy">PostgreSQL-backed notes, rendered simply.</p>
+        </div>
+
+        <nav class="site-nav" aria-label="Primary">
+          <a class="nav-link" href="/notes">All notes</a>
+          <a class="nav-link nav-link--strong" href="/notes/new">New note</a>
+        </nav>
+      </header>
+
+      <main class="page-content">
+        <section class="flash-region" aria-live="polite">
+          {% block flash %}
+          <div class="flash flash--placeholder">System messages will appear here.</div>
+          {% endblock %}
+        </section>
+
+        <section class="content-card">
+          {% block content %}{% endblock %}
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
