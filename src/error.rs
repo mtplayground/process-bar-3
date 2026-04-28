@@ -172,4 +172,11 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
+
+    #[tokio::test]
+    async fn database_errors_render_internal_server_error_status() {
+        let response = AppError::Database(sqlx::Error::RowNotFound).into_response();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
 }
