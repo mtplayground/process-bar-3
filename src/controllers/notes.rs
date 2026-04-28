@@ -21,6 +21,10 @@ pub async fn root_redirect() -> Redirect {
     Redirect::to("/notes")
 }
 
+pub async fn not_found() -> AppError {
+    AppError::not_found("The requested page does not exist.")
+}
+
 pub async fn index(
     State(state): State<AppState>,
     flash: IncomingFlash,
