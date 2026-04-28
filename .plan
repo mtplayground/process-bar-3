@@ -1,46 +1,139 @@
 # Architecture plan
 
+## Target stack
+
+- Rust + Axum for HTTP and routing
+- SQLx with Postgres for persistence and migrations
+- Askama for server-rendered HTML templates
+- `tower-http` for tracing, request IDs, static files, and supporting middleware
+- Cookie-based flash messaging signed with `SESSION_SECRET`
+
 ## Proposed crate structure
 
-- `src/main.rs`: bootstrap tracing, load env, create `PgPool`, build router, start Axum server.
-- `src/app.rs`: `build_router(pool: PgPool) -> Router` and route/layer composition.
-- `src/error.rs`: `AppError`, `AppResult<T>`, `IntoResponse` implementation, shared error conversions.
-- `src/models/mod.rs` and `src/models/note.rs`: `Note` persistence model plus SQLx query methods.
-- `src/forms/mod.rs` and `src/forms/note_input.rs`: `NoteInput`, parsed tags, field-level validation errors.
-- `src/handlers/mod.rs` and `src/handlers/notes.rs`: HTTP handlers for index/show first, then create/update/delete later.
+- `src/main.rs`: bootstrap tracing, load env, create `PgPool`, run migrations, build router, start server.
+- `src/config.rs`: `Config` loader from env using `dotenvy` + `serde`.
+- `src/app.rs`: `AppState` plus `build_router(state: AppState) -> Router`.
+- `src/routes.rs`: route registration and fallback wiring.
+- `src/db.rs`: `init_pool`, migration helpers, and shared DB setup.
+- `src/error.rs`: `AppError`, `AppResult<T>`, `IntoResponse`, shared error conversions, template rendering.
+- `src/models/mod.rs` and `src/models/note.rs`: `Note` persistence model, row mapping, and tag normalization helpers.
+- `src/forms/mod.rs` and `src/forms/note_input.rs`: request-facing form type, parsed tags, and field-level validation errors.
+- `src/handlers/mod.rs` and `src/handlers/notes.rs`: notes HTTP handlers for read/write flows.
+- `src/handlers/flash.rs`: signed flash cookie helpers and flash extractor.
 - `src/middleware/method_override.rs`: HTML form `_method` promotion for `PUT` and `DELETE`.
+- `src/middleware/tracing.rs`: request ID and `TraceLayer` setup if kept separate from `main.rs`.
 - `src/templates/mod.rs`: Askama template exports and shared template helpers.
-- `templates/layout.html`: global shell with nav, flash slot, and content block.
-- `templates/errors/*.html`: not-found and generic error pages.
+- `templates/layout.html`: global shell with flash banner slot and content block.
+- `templates/errors/404.html` and `templates/errors/500.html`: fallback templates.
 - `templates/notes/index.html`, `show.html`, `_form.html`, `new.html`, `edit.html`: notes UI.
-- `static/app.css`: base styling.
+- `static/app.css`: base styling and flash/error states.
+- `migrations/<timestamp>_create_notes.sql`: notes schema migration.
+- `src/bin/seed.rs`: idempotent sample-data loader.
+- `tests/notes_flow.rs`: integration flow using `sqlx::test` and the shared router builder.
 
 ## Shared types and conventions
 
-- `Note`: fields should include `id: Uuid`, `title`, `content`, `tags`, `created_at`, `updated_at`.
-- Store tags as a Postgres text array or equivalent normalized string collection exposed to Rust as `Vec<String>`.
-- `NoteInput`: request-facing form type with `title`, `content`, `tags_raw`; `validate()` returns a structured field-error map that templates can render directly.
-- `AppError`: `NotFound`, `Validation`, `Database`, `Template`, with `From` conversions from SQLx and Askama errors where possible.
-- Handler signatures should return `AppResult<impl IntoResponse>` so issue #10 becomes the central error path instead of ad hoc responses.
-
-## Issue dependency plan
-
-1. Issue #1 defines the cargo crate, dependencies, and the initial app skeleton.
-2. Issue #3 should establish the `Note` model and write-side SQLx patterns first because later issues reference that base.
-3. Issue #2 builds on the same model module for list/find queries.
-4. Issue #4 introduces validated form input that templates and future mutating handlers can share.
-5. Issue #5 creates the layout and CSS baseline.
-6. Issue #6 depends on the layout and the `Note` read model for index/show rendering.
-7. Issue #7 depends on both the layout and `NoteInput` field-error shape.
-8. Issue #8 mounts `ServeDir` after the router skeleton from issue #1 and once `static/` exists.
-9. Issue #10 should land before broad handler work so all routes use one response/error contract.
-10. Issue #13 should land before edit/delete form wiring so REST-style routes work from HTML forms.
-11. Issue #15 can then implement `GET /`, `GET /notes`, and `GET /notes/:id` cleanly against the settled router, templates, and error type.
+- `Config`
+  - `database_url: String`
+  - `bind_addr: String`
+  - `rust_log: String`
+  - `session_secret: String`
+- `AppState`
+  - `pool: PgPool`
+  - `config: Config`
+- `Note`
+  - `id: Uuid`
+  - `title: String`
+  - `content: String`
+  - `tags: Vec<String>`
+  - `created_at: DateTime<Utc>`
+  - `updated_at: DateTime<Utc>`
+- `NoteInput`
+  - `title: String`
+  - `content: String`
+  - `tags_raw: String`
+  - `validate()` returns field-level errors that templates can render directly
+- `FlashMessage`
+  - `kind: FlashKind`
+  - `message: String`
+- `AppError`
+  - `NotFound`
+  - `Validation`
+  - `Database`
+  - `Template`
+  - `Internal`
 
 ## Key design decisions
 
-- Keep HTTP, domain, and template concerns separate from the start to avoid reworking modules as issues add write paths.
-- Prefer a single `notes` handler module and a single `note` model module until the app outgrows that shape.
-- Make templates consume explicit view data rather than reaching into optional state; this keeps Askama types simple.
-- Treat validation errors as first-class data, not strings, so the same structure works for new/edit forms and redirects if needed.
-- Use middleware-based method override instead of handler hacks so routes stay idiomatic Axum.
+- Keep boot logic thin in `main.rs`; move reusable router construction into `app.rs` so integration tests exercise the same router as production.
+- Use a single shared `AppState` injected with `axum::extract::State`; avoid globals.
+- Keep SQLx row mapping in `models::note`, but keep request validation in `forms` and HTTP flow in `handlers`.
+- Represent form tags as a comma-separated string at the boundary and normalize to `Vec<String>` in helper functions.
+- Treat validation errors as structured data instead of plain strings so `new` and `edit` templates can reuse the same rendering path.
+- Centralize HTML error rendering in `AppError` so 404 and 500 pages follow one response contract.
+- Implement flash messages as short-lived signed cookies that are read and cleared once by a helper/extractor used in layout rendering.
+- Use middleware-based method override for browser forms instead of handler-local branching.
+- Run migrations before binding the listener so startup failures are immediate and visible.
+- Prefer a dedicated `src/bin/seed.rs` over a migration for demo data so sample content stays optional and idempotent.
+- Build the Docker runtime image to include only the compiled binary plus `templates/`, `static/`, and `migrations/`.
+
+## Backlog dependency map
+
+### Existing foundation inferred from earlier issues
+
+1. Issue `#1` should establish the crate, dependency set, and minimal Axum entrypoint.
+2. Issue `#3` should define the `Note` persistence/query pattern used by later handlers.
+3. Issue `#2` should cover note read queries that feed index/show pages.
+4. Issue `#4` should define validated note form input and field-error shapes.
+5. Issue `#5` should establish the HTML layout and CSS baseline.
+6. Issue `#6` should wire layout plus note read model into index/show templates.
+7. Issue `#7` should add the reusable note form partial and form rendering conventions.
+8. Issue `#8` should mount static asset serving.
+9. Issue `#10` should establish the central application error path.
+10. Issue `#13` should land method override before edit/delete browser forms.
+11. Issue `#15` should wire `GET /`, `GET /notes`, and `GET /notes/:id`.
+
+### Issues in this session
+
+- `#11` MVC directory layout should land first among the remaining issues to lock in module boundaries.
+- `#9` Config loader is the runtime prerequisite for DB, flash signing, and logging setup.
+- `#14` Tracing depends on the router/app boot path.
+- `#16` Pool initialization depends on config and state wiring.
+- `#17` Notes migration depends on the SQLx/Postgres setup being fixed.
+- `#18` Startup migrations depend on pool initialization and the migration file.
+- `#19` Seed script depends on the notes table existing.
+- `#20` `Note` row mapping depends on the schema being fixed.
+- `#24` Flash helpers depend on config/module wiring because they need `SESSION_SECRET`.
+- `#21`, `#22`, and `#23` depend on the note model, form validation, shared error path, templates, and flash contract.
+- `#25` depends on flash helpers plus the create/update/delete success flows.
+- `#26` depends on the central error path and the template pipeline.
+- `#12` depends on the env contract, asset/template layout, migrations, and startup behavior being known.
+- `#27` should be last once full CRUD and fallback behavior are stable.
+- `#28` should follow Docker and boot/migration workflows so the instructions are accurate.
+
+## Recommended implementation order
+
+1. `#11` Establish MVC directory layout and module wiring
+2. `#9` Add environment configuration loader
+3. `#14` Tracing/logging middleware setup
+4. `#16` Postgres connection pool initialization
+5. `#17` Notes table migration
+6. `#18` Run pending migrations on startup
+7. `#20` `Note` struct and row mapping
+8. `#24` Signed flash cookie helpers
+9. `#21` New and create handlers
+10. `#22` Edit and update handlers
+11. `#23` Delete handler
+12. `#25` Render flash in layout and emit from handlers
+13. `#26` 404 and 500 fallback handlers
+14. `#19` Seed script for sample notes
+15. `#12` Multi-stage Dockerfile and docker-compose
+16. `#27` Integration tests for Notes flow
+17. `#28` README with run instructions
+
+## Risks to avoid
+
+- Do not couple templates directly to SQLx row types; keep template-facing data explicit.
+- Do not bake flash signing logic into handlers; keep it reusable for any redirect path.
+- Do not make Docker depend on seeding; startup should require only config, DB, and migrations.
+- Keep test router construction identical to production router construction to avoid drift.
