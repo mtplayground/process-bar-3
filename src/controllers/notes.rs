@@ -9,28 +9,43 @@ use process_bar_3::{
     flash::{FlashKind, set_flash_cookie},
     forms::note_input::NoteInput,
     models::note::Note,
-    templates::{EditNoteTemplate, NewNoteTemplate, NoteShowTemplate, NotesIndexTemplate},
+    templates::{EditNoteTemplate, LayoutFlash, NewNoteTemplate, NoteShowTemplate, NotesIndexTemplate},
 };
 use tracing::error;
 use uuid::Uuid;
 
 use crate::AppState;
+use crate::views::flash::IncomingFlash;
 
 pub async fn root_redirect() -> Redirect {
     Redirect::to("/notes")
 }
 
-pub async fn index(State(state): State<AppState>) -> AppResult<NotesIndexTemplate> {
+pub async fn index(
+    State(state): State<AppState>,
+    flash: IncomingFlash,
+) -> AppResult<Response> {
     let notes = Note::list(&state.pool).await?;
 
-    Ok(NotesIndexTemplate { notes })
+    Ok(with_cleared_flash_cookie(
+        NotesIndexTemplate {
+            flash: LayoutFlash::from_option(flash.flash.clone()),
+            notes,
+        }
+        .into_response(),
+        flash,
+    ))
 }
 
-pub async fn new() -> AppResult<Response> {
+pub async fn new(flash: IncomingFlash) -> AppResult<Response> {
     let input = NoteInput::default();
     let errors = Default::default();
 
-    Ok(NewNoteTemplate::new(&input, &errors).into_response())
+    Ok(with_cleared_flash_cookie(
+        NewNoteTemplate::new(&input, &errors, LayoutFlash::from_option(flash.flash.clone()))
+            .into_response(),
+        flash,
+    ))
 }
 
 pub async fn create(
@@ -50,13 +65,14 @@ pub async fn create(
                 "Note created successfully.",
             ))
         }
-        Err(errors) => Ok(NewNoteTemplate::new(&input, &errors).into_response()),
+        Err(errors) => Ok(NewNoteTemplate::new(&input, &errors, LayoutFlash::default()).into_response()),
     }
 }
 
 pub async fn edit(
     State(state): State<AppState>,
     Path(note_id): Path<Uuid>,
+    flash: IncomingFlash,
 ) -> AppResult<Response> {
     let note = Note::find(&state.pool, note_id)
         .await?
@@ -64,7 +80,16 @@ pub async fn edit(
     let input = NoteInput::from_note(&note);
     let errors = Default::default();
 
-    Ok(EditNoteTemplate::new(note_id, &input, &errors).into_response())
+    Ok(with_cleared_flash_cookie(
+        EditNoteTemplate::new(
+            note_id,
+            &input,
+            &errors,
+            LayoutFlash::from_option(flash.flash.clone()),
+        )
+        .into_response(),
+        flash,
+    ))
 }
 
 pub async fn update(
@@ -91,19 +116,27 @@ pub async fn update(
                 "Note updated successfully.",
             ))
         }
-        Err(errors) => Ok(EditNoteTemplate::new(note_id, &input, &errors).into_response()),
+        Err(errors) => Ok(EditNoteTemplate::new(note_id, &input, &errors, LayoutFlash::default()).into_response()),
     }
 }
 
 pub async fn show(
     State(state): State<AppState>,
     Path(note_id): Path<Uuid>,
-) -> AppResult<NoteShowTemplate> {
+    flash: IncomingFlash,
+) -> AppResult<Response> {
     let note = Note::find(&state.pool, note_id)
         .await?
         .ok_or_else(|| AppError::not_found("The requested note does not exist."))?;
 
-    Ok(NoteShowTemplate { note })
+    Ok(with_cleared_flash_cookie(
+        NoteShowTemplate {
+            flash: LayoutFlash::from_option(flash.flash.clone()),
+            note,
+        }
+        .into_response(),
+        flash,
+    ))
 }
 
 pub async fn delete(
@@ -140,6 +173,16 @@ fn redirect_with_flash(
         Err(source) => {
             error!(error = ?source, "failed to encode flash cookie");
         }
+    }
+
+    response
+}
+
+fn with_cleared_flash_cookie(mut response: Response, flash: IncomingFlash) -> Response {
+    if let Some(clear_cookie) = flash.clear_cookie {
+        response
+            .headers_mut()
+            .insert(axum::http::header::SET_COOKIE, clear_cookie);
     }
 
     response
