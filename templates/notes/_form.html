@@ -1,0 +1,54 @@
+<form action="{{ form.action }}" method="post" class="stack">
+  {% if form.show_method_override %}
+  <input type="hidden" name="_method" value="{{ form.method_override }}" />
+  {% endif %}
+
+  <label for="title">
+    <span>Title</span>
+    <input
+      id="title"
+      name="title"
+      type="text"
+      maxlength="120"
+      required
+      value="{{ form.input.title }}"
+      placeholder="A short title for the note"
+    />
+    {% if form.has_title_error() %}
+    <span class="field-error">{{ form.title_error() }}</span>
+    {% endif %}
+  </label>
+
+  <label for="content">
+    <span>Content</span>
+    <textarea
+      id="content"
+      name="content"
+      required
+      placeholder="Write the note here..."
+    >{{ form.input.content }}</textarea>
+    {% if form.has_content_error() %}
+    <span class="field-error">{{ form.content_error() }}</span>
+    {% endif %}
+  </label>
+
+  <label for="tags_raw">
+    <span>Tags</span>
+    <input
+      id="tags_raw"
+      name="tags_raw"
+      type="text"
+      value="{{ form.input.tags_raw }}"
+      placeholder="rust, sqlx, ideas"
+    />
+    <span class="note-meta">Separate tags with commas. They will be trimmed and normalized.</span>
+    {% if form.has_tags_error() %}
+    <span class="field-error">{{ form.tags_error() }}</span>
+    {% endif %}
+  </label>
+
+  <div class="actions">
+    <button type="submit">{{ form.submit_label }}</button>
+    <a class="button button--secondary" href="/notes">Cancel</a>
+  </div>
+</form>

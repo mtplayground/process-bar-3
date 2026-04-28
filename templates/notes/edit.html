@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}Edit Note{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <p class="eyebrow">Update Note</p>
+    <h1>Edit note</h1>
+    <p>Revise the current note and save the updated content back to the notes index.</p>
+  </div>
+
+  {% include "notes/_form.html" %}
+</div>
+{% endblock %}

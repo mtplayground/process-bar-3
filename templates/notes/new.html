@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+
+{% block title %}New Note{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <p class="eyebrow">Create Note</p>
+    <h1>New note</h1>
+    <p>Capture a title, the full note body, and any tags you want to keep with it.</p>
+  </div>
+
+  {% include "notes/_form.html" %}
+</div>
+{% endblock %}
