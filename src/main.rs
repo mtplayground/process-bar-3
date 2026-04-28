@@ -5,12 +5,19 @@ mod routes;
 mod views;
 
 use std::{error::Error, net::SocketAddr};
+use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use config::Config;
 use routes::build_router;
+
+#[derive(Clone)]
+pub(crate) struct AppState {
+    #[allow(dead_code)]
+    pub(crate) pool: PgPool,
+}
 
 pub(crate) async fn healthcheck() -> &'static str {
     "ok"
@@ -28,8 +35,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let address: SocketAddr = config.bind_addr.parse()?;
+    let pool = db::init_pool(&config).await?;
+    let state = AppState { pool };
 
-    let app = build_router();
+    let app = build_router(state);
 
     info!("starting server on {}", address);
 
