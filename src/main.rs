@@ -39,6 +39,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let address: SocketAddr = config.bind_addr.parse()?;
     let pool = db::init_pool(&config).await?;
+    db::run_migrations(&pool).await?;
     let state = AppState { pool };
 
     let app = MethodOverrideLayer::new().layer(build_router(state));
