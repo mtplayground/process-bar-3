@@ -8,7 +8,9 @@ use tower_http::{
 };
 use tracing::{info, info_span, Span};
 
-pub fn build_router() -> Router {
+use crate::AppState;
+
+pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/", get(crate::healthcheck))
         .nest_service("/static", ServeDir::new("static"))
@@ -56,4 +58,5 @@ pub fn build_router() -> Router {
         }))
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+        .with_state(state)
 }
