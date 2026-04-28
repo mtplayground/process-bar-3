@@ -22,9 +22,9 @@
 
       <main class="page-content">
         <section class="flash-region" aria-live="polite">
-          {% block flash %}
-          <div class="flash flash--placeholder">System messages will appear here.</div>
-          {% endblock %}
+          {% if flash.is_visible() %}
+          <div class="{{ flash.class_name() }}">{{ flash.message() }}</div>
+          {% endif %}
         </section>
 
         <section class="content-card">

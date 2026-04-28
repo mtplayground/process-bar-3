@@ -1,18 +1,51 @@
 use askama::Template;
 use uuid::Uuid;
 
+use crate::flash::{FlashKind, FlashMessage};
 use crate::forms::note_input::{NoteInput, NoteInputErrors};
 use crate::models::note::Note;
+
+#[derive(Debug, Clone, Default)]
+pub struct LayoutFlash {
+    pub message: Option<FlashMessage>,
+}
+
+impl LayoutFlash {
+    pub fn from_option(message: Option<FlashMessage>) -> Self {
+        Self { message }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.message.is_some()
+    }
+
+    pub fn class_name(&self) -> &'static str {
+        match self.message.as_ref().map(|flash| flash.kind) {
+            Some(FlashKind::Error) => "flash flash--error",
+            Some(FlashKind::Success) => "flash",
+            None => "flash flash--placeholder",
+        }
+    }
+
+    pub fn message(&self) -> &str {
+        self.message
+            .as_ref()
+            .map(|flash| flash.message.as_str())
+            .unwrap_or("")
+    }
+}
 
 #[derive(Debug, Template)]
 #[template(path = "notes/index.html")]
 pub struct NotesIndexTemplate {
+    pub flash: LayoutFlash,
     pub notes: Vec<Note>,
 }
 
 #[derive(Debug, Template)]
 #[template(path = "notes/show.html")]
 pub struct NoteShowTemplate {
+    pub flash: LayoutFlash,
     pub note: Note,
 }
 
@@ -77,12 +110,14 @@ impl<'a> NoteFormView<'a> {
 #[derive(Debug, Template)]
 #[template(path = "notes/new.html")]
 pub struct NewNoteTemplate<'a> {
+    pub flash: LayoutFlash,
     pub form: NoteFormView<'a>,
 }
 
 impl<'a> NewNoteTemplate<'a> {
-    pub fn new(input: &'a NoteInput, errors: &'a NoteInputErrors) -> Self {
+    pub fn new(input: &'a NoteInput, errors: &'a NoteInputErrors, flash: LayoutFlash) -> Self {
         Self {
+            flash,
             form: NoteFormView::for_create(input, errors),
         }
     }
@@ -91,12 +126,19 @@ impl<'a> NewNoteTemplate<'a> {
 #[derive(Debug, Template)]
 #[template(path = "notes/edit.html")]
 pub struct EditNoteTemplate<'a> {
+    pub flash: LayoutFlash,
     pub form: NoteFormView<'a>,
 }
 
 impl<'a> EditNoteTemplate<'a> {
-    pub fn new(note_id: Uuid, input: &'a NoteInput, errors: &'a NoteInputErrors) -> Self {
+    pub fn new(
+        note_id: Uuid,
+        input: &'a NoteInput,
+        errors: &'a NoteInputErrors,
+        flash: LayoutFlash,
+    ) -> Self {
         Self {
+            flash,
             form: NoteFormView::for_update(note_id, input, errors),
         }
     }

@@ -10,6 +10,7 @@ use thiserror::Error;
 use tracing::error;
 
 use crate::flash::{FlashKind, set_flash_cookie};
+use crate::templates::LayoutFlash;
 
 pub type AppResult<T> = Result<T, AppError>;
 
@@ -46,6 +47,7 @@ impl IntoResponse for AppError {
             Self::NotFound { message } => render_template_response(
                 StatusCode::NOT_FOUND,
                 &NotFoundTemplate {
+                    flash: LayoutFlash::default(),
                     message: message.as_str(),
                 },
             ),
@@ -58,6 +60,7 @@ impl IntoResponse for AppError {
                 render_template_response(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     &ServerErrorTemplate {
+                        flash: LayoutFlash::default(),
                         message: "The database request could not be completed.",
                     },
                 )
@@ -67,6 +70,7 @@ impl IntoResponse for AppError {
                 render_template_response(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     &ServerErrorTemplate {
+                        flash: LayoutFlash::default(),
                         message: "The page could not be rendered.",
                     },
                 )
@@ -78,12 +82,14 @@ impl IntoResponse for AppError {
 #[derive(Debug, Template)]
 #[template(path = "errors/404.html")]
 struct NotFoundTemplate<'a> {
+    flash: LayoutFlash,
     message: &'a str,
 }
 
 #[derive(Debug, Template)]
 #[template(path = "errors/500.html")]
 struct ServerErrorTemplate<'a> {
+    flash: LayoutFlash,
     message: &'a str,
 }
 
