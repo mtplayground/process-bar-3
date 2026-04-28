@@ -1,0 +1,13 @@
+.git
+.claude
+target
+.gh_token
+.database_url
+.progress
+.task_id
+.container_name
+.app_name
+.gh_user
+.github_token
+.pipeline-state.json
+.env

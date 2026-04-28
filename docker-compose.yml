@@ -1,0 +1,34 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/process_bar_3
+      BIND_ADDR: 0.0.0.0:8080
+      RUST_LOG: info
+      SESSION_SECRET: development-session-secret
+    ports:
+      - "8080:8080"
+
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: process_bar_3
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d process_bar_3"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
