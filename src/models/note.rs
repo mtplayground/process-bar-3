@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
+use std::collections::BTreeSet;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, FromRow)]
@@ -13,6 +14,28 @@ pub struct Note {
 }
 
 impl Note {
+    pub fn parse_tags_csv(tags_raw: &str) -> Vec<String> {
+        let mut tags = BTreeSet::new();
+
+        for tag in tags_raw.split(',') {
+            let normalized = tag.trim().to_lowercase();
+
+            if !normalized.is_empty() {
+                tags.insert(normalized);
+            }
+        }
+
+        tags.into_iter().collect()
+    }
+
+    pub fn tags_csv(&self) -> String {
+        Self::serialize_tags_csv(&self.tags)
+    }
+
+    pub fn serialize_tags_csv(tags: &[String]) -> String {
+        tags.join(", ")
+    }
+
     pub async fn create(
         pool: &PgPool,
         title: &str,
@@ -97,5 +120,35 @@ impl Note {
         .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Note;
+
+    #[test]
+    fn parse_tags_csv_normalizes_and_deduplicates_tags() {
+        let tags = Note::parse_tags_csv(" Rust, axum, rust , SQLX , , AxUm ");
+
+        assert_eq!(
+            tags,
+            vec![
+                String::from("axum"),
+                String::from("rust"),
+                String::from("sqlx"),
+            ]
+        );
+    }
+
+    #[test]
+    fn serialize_tags_csv_joins_tags_for_forms() {
+        let tags = vec![
+            String::from("axum"),
+            String::from("rust"),
+            String::from("sqlx"),
+        ];
+
+        assert_eq!(Note::serialize_tags_csv(&tags), "axum, rust, sqlx");
     }
 }
