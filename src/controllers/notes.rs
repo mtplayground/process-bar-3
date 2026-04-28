@@ -1,16 +1,17 @@
 use axum::{
     Form,
     extract::{Path, State},
-    http::header::SET_COOKIE,
     response::Redirect,
     response::{IntoResponse, Response},
 };
 use process_bar_3::{
     error::{AppError, AppResult},
+    flash::{FlashKind, set_flash_cookie},
     forms::note_input::NoteInput,
     models::note::Note,
     templates::{EditNoteTemplate, NewNoteTemplate, NoteShowTemplate, NotesIndexTemplate},
 };
+use tracing::error;
 use uuid::Uuid;
 
 use crate::AppState;
@@ -44,6 +45,8 @@ pub async fn create(
 
             Ok(redirect_with_flash(
                 &format!("/notes/{}", note.id),
+                &state.session_secret,
+                FlashKind::Success,
                 "Note created successfully.",
             ))
         }
@@ -83,6 +86,8 @@ pub async fn update(
 
             Ok(redirect_with_flash(
                 &format!("/notes/{}", updated.id),
+                &state.session_secret,
+                FlashKind::Success,
                 "Note updated successfully.",
             ))
         }
@@ -110,6 +115,8 @@ pub async fn delete(
     if deleted {
         Ok(redirect_with_flash(
             "/notes",
+            &state.session_secret,
+            FlashKind::Success,
             "Note deleted successfully.",
         ))
     } else {
@@ -117,30 +124,23 @@ pub async fn delete(
     }
 }
 
-fn redirect_with_flash(redirect_to: &str, message: &str) -> Response {
-    let cookie_value = format!(
-        "flash=success.{}; Max-Age=60; Path=/; HttpOnly; SameSite=Lax",
-        encode_cookie_component(message)
-    );
-
+fn redirect_with_flash(
+    redirect_to: &str,
+    session_secret: &str,
+    kind: FlashKind,
+    message: &str,
+) -> Response {
     let mut response = Redirect::to(redirect_to).into_response();
-    if let Ok(value) = cookie_value.parse() {
-        response.headers_mut().insert(SET_COOKIE, value);
-    }
-    response
-}
-
-fn encode_cookie_component(input: &str) -> String {
-    let mut encoded = String::new();
-
-    for byte in input.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
-            encoded.push(byte as char);
-        } else {
-            encoded.push('%');
-            encoded.push_str(&format!("{byte:02X}"));
+    match set_flash_cookie(session_secret, kind, message) {
+        Ok(value) => {
+            response
+                .headers_mut()
+                .insert(axum::http::header::SET_COOKIE, value);
+        }
+        Err(source) => {
+            error!(error = ?source, "failed to encode flash cookie");
         }
     }
 
-    encoded
+    response
 }
