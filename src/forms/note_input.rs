@@ -28,6 +28,14 @@ impl NoteInputErrors {
 }
 
 impl NoteInput {
+    pub fn from_note(note: &Note) -> Self {
+        Self {
+            title: note.title.clone(),
+            content: note.content.clone(),
+            tags_raw: note.tags_csv(),
+        }
+    }
+
     pub fn validate(&self) -> Result<ValidatedNoteInput, NoteInputErrors> {
         let title = self.title.trim().to_owned();
         let content = self.content.trim().to_owned();
@@ -60,6 +68,7 @@ impl NoteInput {
 #[cfg(test)]
 mod tests {
     use super::{NoteInput, NoteInputErrors, ValidatedNoteInput};
+    use crate::models::note::Note;
 
     #[test]
     fn validate_accepts_valid_input_and_normalizes_fields() {
@@ -122,6 +131,27 @@ mod tests {
                 content: None,
                 tags_raw: None,
             })
+        );
+    }
+
+    #[test]
+    fn from_note_prefills_form_fields() {
+        let note = Note {
+            id: uuid::Uuid::nil(),
+            title: String::from("Existing"),
+            content: String::from("Stored content"),
+            tags: vec![String::from("rust"), String::from("sqlx")],
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        assert_eq!(
+            NoteInput::from_note(&note),
+            NoteInput {
+                title: String::from("Existing"),
+                content: String::from("Stored content"),
+                tags_raw: String::from("rust, sqlx"),
+            }
         );
     }
 }
