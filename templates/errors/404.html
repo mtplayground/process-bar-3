@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+
+{% block title %}Not Found{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <p class="eyebrow">Error 404</p>
+    <h1>That note could not be found.</h1>
+    <p>{{ message }}</p>
+  </div>
+
+  <div class="actions">
+    <a class="button" href="/notes">Back to notes</a>
+    <a class="button button--secondary" href="/notes/new">Create a new note</a>
+  </div>
+</div>
+{% endblock %}
