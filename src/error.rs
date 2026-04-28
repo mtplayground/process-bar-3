@@ -2,12 +2,14 @@ use askama::Template;
 use axum::{
     http::{
         header::SET_COOKIE,
-        HeaderValue, StatusCode,
+        StatusCode,
     },
     response::{Html, IntoResponse, Redirect, Response},
 };
 use thiserror::Error;
 use tracing::error;
+
+use crate::flash::{FlashKind, set_flash_cookie};
 
 pub type AppResult<T> = Result<T, AppError>;
 
@@ -105,49 +107,56 @@ where
 }
 
 fn redirect_with_flash(redirect_to: &str, message: &str) -> Response {
-    let encoded_message = encode_cookie_component(message);
-    let cookie_value = format!("flash=error.{encoded_message}; Max-Age=60; Path=/; HttpOnly; SameSite=Lax");
-
     let mut response = Redirect::to(redirect_to).into_response();
-    if let Ok(value) = HeaderValue::from_str(&cookie_value) {
-        response.headers_mut().insert(SET_COOKIE, value);
-    } else {
-        error!("failed to encode flash cookie");
-    }
-    response
-}
-
-fn encode_cookie_component(input: &str) -> String {
-    let mut encoded = String::new();
-
-    for byte in input.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
-            encoded.push(byte as char);
-        } else {
-            encoded.push('%');
-            encoded.push_str(&format!("{byte:02X}"));
+    match std::env::var("SESSION_SECRET") {
+        Ok(secret) => match set_flash_cookie(&secret, FlashKind::Error, message) {
+            Ok(value) => {
+                response.headers_mut().insert(SET_COOKIE, value);
+            }
+            Err(source) => {
+                error!(error = ?source, "failed to encode flash cookie");
+            }
+        },
+        Err(source) => {
+            error!(error = ?source, "session secret was unavailable for flash cookie");
         }
     }
 
-    encoded
+    response
 }
 
 #[cfg(test)]
 mod tests {
     use super::AppError;
     use axum::{
-        http::{header::SET_COOKIE, StatusCode},
+        http::{HeaderValue, header::SET_COOKIE, StatusCode},
         response::IntoResponse,
     };
+    use crate::flash::{FlashKind, take_flash_cookie};
+
+    fn set_test_session_secret() {
+        unsafe {
+            std::env::set_var("SESSION_SECRET", "test-session-secret");
+        }
+    }
 
     #[tokio::test]
     async fn validation_error_redirects_with_flash_cookie() {
+        set_test_session_secret();
         let response = AppError::validation("Title is required.", "/notes/new").into_response();
+        let set_cookie = response.headers().get(SET_COOKIE).and_then(|value| value.to_str().ok());
+        let cookie = set_cookie
+            .and_then(|value| value.split(';').next())
+            .and_then(|value| HeaderValue::from_str(value).ok());
+        let read = match take_flash_cookie("test-session-secret", cookie.as_ref()) {
+            Ok(read) => read,
+            Err(error) => panic!("expected flash cookie to be readable: {error}"),
+        };
 
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
         assert_eq!(
-            response.headers().get(SET_COOKIE).unwrap(),
-            "flash=error.Title%20is%20required.; Max-Age=60; Path=/; HttpOnly; SameSite=Lax"
+            read.flash.map(|flash| (flash.kind, flash.message)),
+            Some((FlashKind::Error, String::from("Title is required.")))
         );
     }
 
