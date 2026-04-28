@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block title %}All Notes{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <p class="eyebrow">Notes Index</p>
+    <h1>All notes</h1>
+    <p>Browse every note, newest first, with quick access to edit or remove each entry.</p>
+  </div>
+
+  {% if notes.is_empty() %}
+  <div class="empty-state">
+    <p>No notes exist yet.</p>
+    <a class="button" href="/notes/new">Create the first note</a>
+  </div>
+  {% else %}
+  <div class="note-list">
+    {% for note in notes %}
+    <article class="note-row">
+      <div class="note-row__head">
+        <div class="stack">
+          <h2 class="note-title">
+            <a href="/notes/{{ note.id }}">{{ note.title }}</a>
+          </h2>
+          <p class="note-meta">Created {{ note.created_at }}</p>
+        </div>
+
+        <div class="actions">
+          <a class="button button--secondary" href="/notes/{{ note.id }}/edit">Edit</a>
+          <form class="inline-form" action="/notes/{{ note.id }}" method="post">
+            <input type="hidden" name="_method" value="DELETE" />
+            <button type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+
+      {% if note.tags.is_empty() %}
+      <p class="note-meta">No tags</p>
+      {% else %}
+      <div class="chip-row" aria-label="Tags">
+        {% for tag in note.tags %}
+        <span class="chip">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
