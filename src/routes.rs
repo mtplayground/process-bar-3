@@ -8,11 +8,14 @@ use tower_http::{
 };
 use tracing::{info, info_span, Span};
 
+use crate::controllers::notes;
 use crate::AppState;
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
-        .route("/", get(crate::healthcheck))
+        .route("/", get(notes::root_redirect))
+        .route("/notes", get(notes::index))
+        .route("/notes/:id", get(notes::show))
         .nest_service("/static", ServeDir::new("static"))
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
             let request_id = request

@@ -22,10 +22,6 @@ pub(crate) struct AppState {
     pub(crate) pool: PgPool,
 }
 
-pub(crate) async fn healthcheck() -> &'static str {
-    "ok"
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_env()?;

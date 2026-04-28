@@ -6,14 +6,14 @@ use crate::models::note::Note;
 
 #[derive(Debug, Template)]
 #[template(path = "notes/index.html")]
-pub struct NotesIndexTemplate<'a> {
-    pub notes: &'a [Note],
+pub struct NotesIndexTemplate {
+    pub notes: Vec<Note>,
 }
 
 #[derive(Debug, Template)]
 #[template(path = "notes/show.html")]
-pub struct NoteShowTemplate<'a> {
-    pub note: &'a Note,
+pub struct NoteShowTemplate {
+    pub note: Note,
 }
 
 #[derive(Debug)]
