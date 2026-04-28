@@ -10,10 +10,12 @@ axum = "0.7"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 envy = "0.4"
+form_urlencoded = "1"
 serde = { version = "1", features = ["derive"] }
 sqlx = { version = "0.8", default-features = false, features = ["chrono", "macros", "postgres", "runtime-tokio-rustls", "uuid"] }
 thiserror = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["fs", "request-id", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
