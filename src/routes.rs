@@ -16,7 +16,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/", get(notes::root_redirect))
         .route("/notes", get(notes::index).post(notes::create))
         .route("/notes/new", get(notes::new))
-        .route("/notes/:id", get(notes::show))
+        .route("/notes/:id/edit", get(notes::edit))
+        .route("/notes/:id", get(notes::show).put(notes::update))
         .nest_service("/static", ServeDir::new("static"))
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
             let request_id = request
