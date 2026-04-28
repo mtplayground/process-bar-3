@@ -1,16 +1,19 @@
 mod config;
 mod controllers;
 mod db;
+mod middleware;
 mod routes;
 mod views;
 
 use std::{error::Error, net::SocketAddr};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
+use tower::{make::Shared, Layer};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use config::Config;
+use middleware::method_override::MethodOverrideLayer;
 use routes::build_router;
 
 #[derive(Clone)]
@@ -38,12 +41,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let pool = db::init_pool(&config).await?;
     let state = AppState { pool };
 
-    let app = build_router(state);
+    let app = MethodOverrideLayer::new().layer(build_router(state));
 
     info!("starting server on {}", address);
 
     let listener = TcpListener::bind(address).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, Shared::new(app)).await?;
 
     Ok(())
 }
