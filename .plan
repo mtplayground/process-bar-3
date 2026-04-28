@@ -1,0 +1,46 @@
+# Architecture plan
+
+## Proposed crate structure
+
+- `src/main.rs`: bootstrap tracing, load env, create `PgPool`, build router, start Axum server.
+- `src/app.rs`: `build_router(pool: PgPool) -> Router` and route/layer composition.
+- `src/error.rs`: `AppError`, `AppResult<T>`, `IntoResponse` implementation, shared error conversions.
+- `src/models/mod.rs` and `src/models/note.rs`: `Note` persistence model plus SQLx query methods.
+- `src/forms/mod.rs` and `src/forms/note_input.rs`: `NoteInput`, parsed tags, field-level validation errors.
+- `src/handlers/mod.rs` and `src/handlers/notes.rs`: HTTP handlers for index/show first, then create/update/delete later.
+- `src/middleware/method_override.rs`: HTML form `_method` promotion for `PUT` and `DELETE`.
+- `src/templates/mod.rs`: Askama template exports and shared template helpers.
+- `templates/layout.html`: global shell with nav, flash slot, and content block.
+- `templates/errors/*.html`: not-found and generic error pages.
+- `templates/notes/index.html`, `show.html`, `_form.html`, `new.html`, `edit.html`: notes UI.
+- `static/app.css`: base styling.
+
+## Shared types and conventions
+
+- `Note`: fields should include `id: Uuid`, `title`, `content`, `tags`, `created_at`, `updated_at`.
+- Store tags as a Postgres text array or equivalent normalized string collection exposed to Rust as `Vec<String>`.
+- `NoteInput`: request-facing form type with `title`, `content`, `tags_raw`; `validate()` returns a structured field-error map that templates can render directly.
+- `AppError`: `NotFound`, `Validation`, `Database`, `Template`, with `From` conversions from SQLx and Askama errors where possible.
+- Handler signatures should return `AppResult<impl IntoResponse>` so issue #10 becomes the central error path instead of ad hoc responses.
+
+## Issue dependency plan
+
+1. Issue #1 defines the cargo crate, dependencies, and the initial app skeleton.
+2. Issue #3 should establish the `Note` model and write-side SQLx patterns first because later issues reference that base.
+3. Issue #2 builds on the same model module for list/find queries.
+4. Issue #4 introduces validated form input that templates and future mutating handlers can share.
+5. Issue #5 creates the layout and CSS baseline.
+6. Issue #6 depends on the layout and the `Note` read model for index/show rendering.
+7. Issue #7 depends on both the layout and `NoteInput` field-error shape.
+8. Issue #8 mounts `ServeDir` after the router skeleton from issue #1 and once `static/` exists.
+9. Issue #10 should land before broad handler work so all routes use one response/error contract.
+10. Issue #13 should land before edit/delete form wiring so REST-style routes work from HTML forms.
+11. Issue #15 can then implement `GET /`, `GET /notes`, and `GET /notes/:id` cleanly against the settled router, templates, and error type.
+
+## Key design decisions
+
+- Keep HTTP, domain, and template concerns separate from the start to avoid reworking modules as issues add write paths.
+- Prefer a single `notes` handler module and a single `note` model module until the app outgrows that shape.
+- Make templates consume explicit view data rather than reaching into optional state; this keeps Askama types simple.
+- Treat validation errors as first-class data, not strings, so the same structure works for new/edit forms and redirects if needed.
+- Use middleware-based method override instead of handler hacks so routes stay idiomatic Axum.
