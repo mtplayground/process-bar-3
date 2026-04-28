@@ -14,7 +14,8 @@ use crate::AppState;
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/", get(notes::root_redirect))
-        .route("/notes", get(notes::index))
+        .route("/notes", get(notes::index).post(notes::create))
+        .route("/notes/new", get(notes::new))
         .route("/notes/:id", get(notes::show))
         .nest_service("/static", ServeDir::new("static"))
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
