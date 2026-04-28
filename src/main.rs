@@ -1,4 +1,10 @@
 mod config;
+mod controllers;
+mod db;
+mod error;
+mod models;
+mod routes;
+mod views;
 
 use axum::{routing::get, Router};
 use std::{error::Error, net::SocketAddr};
