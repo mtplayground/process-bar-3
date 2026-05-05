@@ -219,6 +219,19 @@ mod tests {
         let delete_cookie = cookie_pair(&delete_response);
         assert!(delete_cookie.is_some());
 
+        let deleted_show_response = request(
+            app.clone(),
+            build_request(
+                Request::builder()
+                    .uri(&created_path)
+                    .body(Body::empty()),
+            ),
+        )
+        .await;
+        assert_eq!(deleted_show_response.status(), StatusCode::NOT_FOUND);
+        let deleted_show_body = body_text(deleted_show_response).await;
+        assert!(deleted_show_body.contains("The requested note does not exist."));
+
         let deleted_list_response = request(
             app,
             build_request(

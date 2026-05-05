@@ -143,6 +143,7 @@ mod tests {
             tags: vec![String::from("rust"), String::from("sqlx")],
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            deleted_at: None,
         };
 
         assert_eq!(

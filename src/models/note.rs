@@ -186,6 +186,7 @@ impl Note {
 #[cfg(test)]
 mod tests {
     use super::Note;
+    use sqlx::PgPool;
 
     #[test]
     fn parse_tags_csv_normalizes_and_deduplicates_tags() {
@@ -210,5 +211,121 @@ mod tests {
         ];
 
         assert_eq!(Note::serialize_tags_csv(&tags), "axum, rust, sqlx");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_excludes_soft_deleted_notes(pool: PgPool) {
+        let active = create_note(&pool, "Active note").await;
+        let deleted = create_note(&pool, "Deleted note").await;
+
+        assert!(delete_note(&pool, deleted.id).await);
+
+        let notes = match Note::list(&pool).await {
+            Ok(notes) => notes,
+            Err(error) => panic!("expected list query to succeed: {error}"),
+        };
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id, active.id);
+        assert!(notes.iter().all(|note| note.deleted_at.is_none()));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_returns_none_for_soft_deleted_notes(pool: PgPool) {
+        let note = create_note(&pool, "Deleted note").await;
+
+        assert!(delete_note(&pool, note.id).await);
+
+        let found = match Note::find(&pool, note.id).await {
+            Ok(found) => found,
+            Err(error) => panic!("expected find query to succeed: {error}"),
+        };
+
+        assert!(found.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_sets_deleted_at_instead_of_removing_row(pool: PgPool) {
+        let note = create_note(&pool, "Soft delete target").await;
+
+        let deleted = delete_note(&pool, note.id).await;
+        let found = match Note::find_including_deleted(&pool, note.id).await {
+            Ok(found) => found,
+            Err(error) => panic!("expected deleted note lookup to succeed: {error}"),
+        };
+
+        assert!(deleted);
+        assert!(found.is_some());
+        assert!(found.and_then(|note| note.deleted_at).is_some());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_returns_false_when_note_is_already_deleted(pool: PgPool) {
+        let note = create_note(&pool, "Already deleted").await;
+
+        assert!(delete_note(&pool, note.id).await);
+
+        let deleted_again = match Note::delete(&pool, note.id).await {
+            Ok(deleted) => deleted,
+            Err(error) => panic!("expected second delete query to succeed: {error}"),
+        };
+
+        assert!(!deleted_again);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_including_deleted_returns_soft_deleted_notes(pool: PgPool) {
+        let note = create_note(&pool, "Deleted but queryable").await;
+
+        assert!(delete_note(&pool, note.id).await);
+
+        let found = match Note::find_including_deleted(&pool, note.id).await {
+            Ok(found) => found,
+            Err(error) => panic!("expected deleted note lookup to succeed: {error}"),
+        };
+
+        assert!(found.is_some());
+        assert_eq!(found.map(|note| note.id), Some(note.id));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn restore_makes_soft_deleted_note_visible_to_find(pool: PgPool) {
+        let note = create_note(&pool, "Restorable note").await;
+
+        assert!(delete_note(&pool, note.id).await);
+        assert!(find_note(&pool, note.id).await.is_none());
+
+        let restored = match Note::restore(&pool, note.id).await {
+            Ok(restored) => restored,
+            Err(error) => panic!("expected restore query to succeed: {error}"),
+        };
+        let found = find_note(&pool, note.id).await;
+
+        assert!(restored.is_some());
+        assert!(restored.as_ref().and_then(|note| note.deleted_at).is_none());
+        assert_eq!(found.map(|note| note.id), Some(note.id));
+    }
+
+    async fn create_note(pool: &PgPool, title: &str) -> Note {
+        let tags = vec![String::from("test")];
+
+        match Note::create(pool, title, "Body", &tags).await {
+            Ok(note) => note,
+            Err(error) => panic!("expected note to be created: {error}"),
+        }
+    }
+
+    async fn delete_note(pool: &PgPool, id: uuid::Uuid) -> bool {
+        match Note::delete(pool, id).await {
+            Ok(deleted) => deleted,
+            Err(error) => panic!("expected delete query to succeed: {error}"),
+        }
+    }
+
+    async fn find_note(pool: &PgPool, id: uuid::Uuid) -> Option<Note> {
+        match Note::find(pool, id).await {
+            Ok(found) => found,
+            Err(error) => panic!("expected find query to succeed: {error}"),
+        }
     }
 }
