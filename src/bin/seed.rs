@@ -58,9 +58,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn notes_exist(pool: &PgPool) -> Result<bool, sqlx::Error> {
-    let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM notes")
-        .fetch_one(pool)
-        .await?;
+    let count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL",
+    )
+    .fetch_one(pool)
+    .await?;
 
     Ok(count > 0)
 }
