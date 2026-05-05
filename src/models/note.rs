@@ -11,9 +11,12 @@ pub struct Note {
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl Note {
+    const RETURNING_COLUMNS: &str = "id, title, content, tags, created_at, updated_at, deleted_at";
+
     pub fn parse_tags_csv(tags_raw: &str) -> Vec<String> {
         let mut tags = BTreeSet::new();
 
@@ -43,11 +46,14 @@ impl Note {
         tags: &[String],
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
-            INSERT INTO notes (title, content, tags)
-            VALUES ($1, $2, $3)
-            RETURNING id, title, content, tags, created_at, updated_at
-            "#,
+            &format!(
+                r#"
+                INSERT INTO notes (title, content, tags)
+                VALUES ($1, $2, $3)
+                RETURNING {}
+                "#,
+                Self::RETURNING_COLUMNS
+            ),
         )
         .bind(title)
         .bind(content)
@@ -58,11 +64,15 @@ impl Note {
 
     pub async fn list(pool: &PgPool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
-            SELECT id, title, content, tags, created_at, updated_at
-            FROM notes
-            ORDER BY created_at DESC, id DESC
-            "#,
+            &format!(
+                r#"
+                SELECT {}
+                FROM notes
+                WHERE deleted_at IS NULL
+                ORDER BY created_at DESC, id DESC
+                "#,
+                Self::RETURNING_COLUMNS
+            ),
         )
         .fetch_all(pool)
         .await
@@ -70,12 +80,36 @@ impl Note {
 
     pub async fn find(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
-            SELECT id, title, content, tags, created_at, updated_at
-            FROM notes
-            WHERE id = $1
-            LIMIT 1
-            "#,
+            &format!(
+                r#"
+                SELECT {}
+                FROM notes
+                WHERE id = $1
+                  AND deleted_at IS NULL
+                LIMIT 1
+                "#,
+                Self::RETURNING_COLUMNS
+            ),
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    pub async fn find_including_deleted(
+        pool: &PgPool,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            &format!(
+                r#"
+                SELECT {}
+                FROM notes
+                WHERE id = $1
+                LIMIT 1
+                "#,
+                Self::RETURNING_COLUMNS
+            ),
         )
         .bind(id)
         .fetch_optional(pool)
@@ -90,15 +124,19 @@ impl Note {
         tags: &[String],
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
-            UPDATE notes
-            SET title = $2,
-                content = $3,
-                tags = $4,
-                updated_at = NOW()
-            WHERE id = $1
-            RETURNING id, title, content, tags, created_at, updated_at
-            "#,
+            &format!(
+                r#"
+                UPDATE notes
+                SET title = $2,
+                    content = $3,
+                    tags = $4,
+                    updated_at = NOW()
+                WHERE id = $1
+                  AND deleted_at IS NULL
+                RETURNING {}
+                "#,
+                Self::RETURNING_COLUMNS
+            ),
         )
         .bind(id)
         .bind(title)
@@ -111,8 +149,11 @@ impl Note {
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
-            DELETE FROM notes
+            UPDATE notes
+            SET deleted_at = NOW(),
+                updated_at = NOW()
             WHERE id = $1
+              AND deleted_at IS NULL
             "#,
         )
         .bind(id)
@@ -120,6 +161,25 @@ impl Note {
         .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn restore(pool: &PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            &format!(
+                r#"
+                UPDATE notes
+                SET deleted_at = NULL,
+                    updated_at = NOW()
+                WHERE id = $1
+                  AND deleted_at IS NOT NULL
+                RETURNING {}
+                "#,
+                Self::RETURNING_COLUMNS
+            ),
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
     }
 }
 
