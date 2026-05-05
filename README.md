@@ -80,6 +80,30 @@ Required variables:
 - `RUST_LOG`
 - `SESSION_SECRET`
 
+## External Data Access
+
+External read-only consumers should query the `active_notes` database view instead of
+reading directly from the `notes` table.
+
+The view is created by `migrations/20260505063000_create_active_notes_view.sql`:
+
+```sql
+SELECT id, title, content, tags, created_at, updated_at
+FROM active_notes;
+```
+
+Contract details:
+
+- `active_notes` exposes only non-deleted notes.
+- A note disappears from `active_notes` as soon as the application soft-deletes it by
+  setting `notes.deleted_at`.
+- The view returns the columns `id`, `title`, `content`, `tags`, `created_at`, and
+  `updated_at`.
+- External systems that only need current note content should treat `active_notes` as
+  the stable read surface.
+- Direct reads from `notes` are only appropriate when a consumer explicitly needs
+  soft-deleted rows or the internal `deleted_at` lifecycle field.
+
 ## Project Layout
 
 The codebase follows a lightweight MVC layout:
